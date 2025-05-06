@@ -1,3 +1,5 @@
 /input
 /output
+/files
 *.exe
+go.mod

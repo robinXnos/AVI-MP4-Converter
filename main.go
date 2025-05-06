@@ -1,8 +1,9 @@
 package main
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,47 +11,26 @@ import (
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-
-	// Prompt the user for the path to HandBrakeCLI
-	fmt.Print("Enter the path of HandBrakeCLI: ")
-	handBrakeCLIPath, _ := reader.ReadString('\n')
-	handBrakeCLIPath = strings.TrimSpace(handBrakeCLIPath)
-
-	// Check if the HandBrakeCLI path exists
-	if _, err := os.Stat(handBrakeCLIPath); os.IsNotExist(err) {
-		fmt.Printf("Error: HandBrakeCLI not found at %s\n", handBrakeCLIPath)
+	jsonFile, err := os.Open("paths.json")
+	if err != nil {
+		fmt.Println("Error reading JsonFile", err)
 		return
 	}
 
-	// Prompt the user for the input directory
-	fmt.Print("Enter the input directory: ")
-	inputDir, _ := reader.ReadString('\n')
-	inputDir = strings.TrimSpace(inputDir)
+	byteVal, err := io.ReadAll(jsonFile)
 
-	// Check if the input directory exists
-	if _, err := os.Stat(inputDir); os.IsNotExist(err) {
-		fmt.Printf("Error: Input directory not found at %s\n", inputDir)
-		return
+	var paths struct {
+		InputDir      string
+		HandbrakePath string
+		OutputDir     string
 	}
+	json.Unmarshal(byteVal, &paths)
 
-	// Prompt the user for the output directory
-	fmt.Print("Enter the output directory: ")
-	outputDir, _ := reader.ReadString('\n')
-	outputDir = strings.TrimSpace(outputDir)
-
-	// Create the output directory if it does not exist
-	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
-		err := os.Mkdir(outputDir, os.ModePerm)
-		if err != nil {
-			fmt.Printf("Error creating output folder: %v\n", err)
-			return
-		}
-	}
+	fmt.Printf("paths: %v\n", paths)
 
 	// Find AVI files (case-insensitive) in the input directory
 	var files []string
-	err := filepath.Walk(inputDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(paths.InputDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -71,12 +51,12 @@ func main() {
 	}
 
 	for _, inputFile := range files {
-		outputFile := filepath.Join(outputDir, strings.TrimSuffix(filepath.Base(inputFile), filepath.Ext(inputFile))+".mp4")
+		outputFile := filepath.Join(paths.OutputDir, strings.TrimSuffix(filepath.Base(inputFile), filepath.Ext(inputFile))+".mp4")
 		fmt.Printf("Converting: %s -> %s\n", inputFile, outputFile)
 
 		// HandBrakeCLI command
 		cmd := exec.Command(
-			handBrakeCLIPath,
+			paths.HandbrakePath,
 			"-i", inputFile,
 			"-o", outputFile,
 			"-e", "x264",
